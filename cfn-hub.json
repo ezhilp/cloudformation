@@ -1,0 +1,250 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "EC2 CloudFormation Template For creting an instance.",
+  "Parameters": {
+    "EnvironUsed": {
+      "Default": "dev",
+      "Type": "String",
+      "AllowedValues": [
+        "dev",
+        "uat",
+        "rc",
+        "prod"
+      ]
+    }
+  },
+  "Mappings": {
+    "Environments": {
+      "dev": {
+        "InstanceType": "t2.micro",
+        "AMIID": "ami-45c4ae52",
+        "InstanceKeyName": "bms-infocatalog",
+        "SubnetId": "subnet-a343b7ea",
+        "SecuritygroupIds": [
+          "sg-d57885a9",
+          "sg-bfafd0da"
+        ]
+      }
+    }
+  },
+  "Resources": {
+    "ICNEC2Instance": {
+      "Type": "AWS::EC2::Instance",
+      "CreationPolicy": {
+        "ResourceSignal": {
+          "Timeout": "PT5M"
+        }
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Init": {
+          "config": {
+            "files": {
+              "/tmp/test.log": {
+                "content": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "ezhil\n",
+                      "brillio \n",
+					  "bms \n"
+                    ]
+                  ]
+                },
+                "mode": "000644",
+                "owner": "apache",
+                "group": "apache"
+              },
+              "/tmp/test1.log": {
+                "content": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "ezhil\n",
+                      "brillio \n"
+                    ]
+                  ]
+                },
+                "mode": "000644",
+                "owner": "apache",
+                "group": "apache"
+              },
+              "/etc/cfn/cfn-hup.conf": {
+                "content": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "[main]\n",
+                      "stack=",
+                      {
+                        "Ref": "AWS::StackId"
+                      },
+                      "\n",
+                      "region=",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "\n"
+                    ]
+                  ]
+                },
+                "mode": "000400",
+                "owner": "root",
+                "group": "root"
+              },
+              "/etc/cfn/hooks.d/cfn-auto-reloader.conf": {
+                "content": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "[cfn-auto-reloader-hook]\n",
+                      "triggers=post.update\n",
+                      "path=Resources.ICNEC2Instance.Metadata.AWS::CloudFormation::Init\n",
+                      "action=/opt/aws/bin/cfn-init -s ",
+                      {
+                        "Ref": "AWS::StackId"
+                      },
+                      " -r ICNEC2Instance ",
+                      " --region     ",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "\n",
+                      "runas=root\n"
+                    ]
+                  ]
+                }
+              }
+            },
+            "commands": {
+              "test": {
+                "command": "echo \"$MAGIC\" >> /tmp/test.txt",
+                "env": {
+                  "MAGIC": "I come from the environment!"
+                }
+              },
+              "test2": {
+                "command": "echo modified \"$MAGIC2\" >> /tmp/test2.txt",
+                "env": {
+                  "MAGIC2": "I come from the environment 2!"
+                }
+              }
+            },
+            "services": {
+              "sysvinit": {
+                "cfn-hup": {
+                  "enabled": "true",
+                  "ensureRunning": "true",
+                  "files": [
+                    "/etc/cfn/cfn-hup.conf",
+                    "/etc/cfn/hooks.d/cfn-auto-reloader.conf"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "Properties": {
+        "InstanceType": {
+          "Fn::FindInMap": [
+            "Environments",
+            {
+              "Ref": "EnvironUsed"
+            },
+            "InstanceType"
+          ]
+        },
+        "ImageId": {
+          "Fn::FindInMap": [
+            "Environments",
+            {
+              "Ref": "EnvironUsed"
+            },
+            "AMIID"
+          ]
+        },
+        "KeyName": {
+          "Fn::FindInMap": [
+            "Environments",
+            {
+              "Ref": "EnvironUsed"
+            },
+            "InstanceKeyName"
+          ]
+        },
+        "SubnetId": {
+          "Fn::FindInMap": [
+            "Environments",
+            {
+              "Ref": "EnvironUsed"
+            },
+            "SubnetId"
+          ]
+        },
+        "SecurityGroupIds": {
+          "Fn::FindInMap": [
+            "Environments",
+            {
+              "Ref": "EnvironUsed"
+            },
+            "SecuritygroupIds"
+          ]
+        },
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "",
+              [
+                "#!/bin/bash \n",
+                "yum install -y aws-cfn-bootstrap\n",
+                "# Install the files and packages from the metadata\n",
+                "/opt/aws/bin/cfn-init -v ",
+                "         --stack ",
+                {
+                  "Ref": "AWS::StackName"
+                },
+                "         --resource ICNEC2Instance ",
+                "         --region ",
+                {
+                  "Ref": "AWS::Region"
+                },
+                "\n",
+                "# Start up the cfn-hup daemon to listen for changes to the Web Server metadata\n",
+                "/opt/aws/bin/cfn-hup || error_exit 'Failed to start cfn-hup'\n",
+                "# Signal the status from cfn-init\n",
+                "/opt/aws/bin/cfn-signal -e $? ",
+                "         --stack ",
+                {
+                  "Ref": "AWS::StackName"
+                },
+                "         --resource ICNEC2Instance ",
+                "         --region ",
+                {
+                  "Ref": "AWS::Region"
+                },
+                "\n"
+              ]
+            ]
+          }
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "BMSCFNHUBTEST"
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "EC2IP": {
+      "Description": "EC2 Private IpAddress",
+      "Value": {
+        "Fn::GetAtt": [
+          "ICNEC2Instance",
+          "PrivateIp"
+        ]
+      }
+    }
+  }
+}
